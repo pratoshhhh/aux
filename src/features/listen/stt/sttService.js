@@ -26,13 +26,13 @@ class SttService {
         this.theirSttSession = null;
         this.myCurrentUtterance = '';
         this.theirCurrentUtterance = '';
-        
+
         // Turn-completion debouncing
         this.myCompletionBuffer = '';
         this.theirCompletionBuffer = '';
         this.myCompletionTimer = null;
         this.theirCompletionTimer = null;
-        
+
         // System audio capture
         this.systemAudioProc = null;
 
@@ -44,7 +44,7 @@ class SttService {
         this.onTranscriptionComplete = null;
         this.onStatusUpdate = null;
 
-        this.modelInfo = null; 
+        this.modelInfo = null;
     }
 
     setCallbacks({ onTranscriptionComplete, onStatusUpdate }) {
@@ -56,7 +56,7 @@ class SttService {
         // Listen 관련 이벤트는 Listen 윈도우에만 전송 (Ask 윈도우 충돌 방지)
         const { windowPool } = require('../../../window/windowManager');
         const listenWindow = windowPool?.get('listen');
-        
+
         if (listenWindow && !listenWindow.isDestroyed()) {
             listenWindow.webContents.send(channel, data);
         }
@@ -81,7 +81,7 @@ class SttService {
         if (this.onTranscriptionComplete) {
             this.onTranscriptionComplete('Me', finalText);
         }
-        
+
         // Send to renderer as final
         this.sendToRenderer('stt-update', {
             speaker: 'Me',
@@ -94,7 +94,7 @@ class SttService {
         this.myCompletionBuffer = '';
         this.myCompletionTimer = null;
         this.myCurrentUtterance = '';
-        
+
         if (this.onStatusUpdate) {
             this.onStatusUpdate('Listening...');
         }
@@ -103,12 +103,12 @@ class SttService {
     flushTheirCompletion() {
         const finalText = (this.theirCompletionBuffer + this.theirCurrentUtterance).trim();
         if (!this.modelInfo || !finalText) return;
-        
+
         // Notify completion callback
         if (this.onTranscriptionComplete) {
             this.onTranscriptionComplete('Them', finalText);
         }
-        
+
         // Send to renderer as final
         this.sendToRenderer('stt-update', {
             speaker: 'Them',
@@ -121,7 +121,7 @@ class SttService {
         this.theirCompletionBuffer = '';
         this.theirCompletionTimer = null;
         this.theirCurrentUtterance = '';
-        
+
         if (this.onStatusUpdate) {
             this.onStatusUpdate('Listening...');
         }
@@ -165,12 +165,12 @@ class SttService {
                 return;
             }
             // console.log('[SttService] handleMyMessage', message);
-            
+
             if (this.modelInfo.provider === 'whisper') {
                 // Whisper STT emits 'transcription' events with different structure
                 if (message.text && message.text.trim()) {
                     const finalText = message.text.trim();
-                    
+
                     // Filter out Whisper noise transcriptions
                     const noisePatterns = [
                         '[BLANK_AUDIO]',
@@ -184,15 +184,15 @@ class SttService {
                         '(SOUND)',
                         '(NOISE)'
                     ];
-                    
-                    const isNoise = noisePatterns.some(pattern => 
+
+                    const isNoise = noisePatterns.some(pattern =>
                         finalText.includes(pattern) || finalText === pattern
                     );
-                    
-                    
+
+
                     if (!isNoise && finalText.length > 2) {
                         this.debounceMyCompletion(finalText);
-                        
+
                         this.sendToRenderer('stt-update', {
                             speaker: 'Me',
                             text: finalText,
@@ -217,17 +217,17 @@ class SttService {
                     }
                     return;
                 }
-            
+
                 const transcription = message.serverContent?.inputTranscription;
                 if (!transcription || !transcription.text) return;
-                
+
                 const textChunk = transcription.text;
                 if (!textChunk.trim() || textChunk.trim() === '<noise>') {
                     return; // 1. Ignore whitespace-only chunks or noise
                 }
-            
+
                 this.debounceMyCompletion(textChunk);
-                
+
                 this.sendToRenderer('stt-update', {
                     speaker: 'Me',
                     text: this.myCompletionBuffer,
@@ -235,8 +235,8 @@ class SttService {
                     isFinal: false,
                     timestamp: Date.now(),
                 });
-                
-            // Deepgram 
+
+                // Deepgram 
             } else if (this.modelInfo.provider === 'deepgram') {
                 const text = message.channel?.alternatives?.[0]?.transcript;
                 if (!text || text.trim().length === 0) return;
@@ -247,15 +247,15 @@ class SttService {
                 if (isFinal) {
                     // 최종 결과가 도착하면, 현재 진행중인 부분 발화는 비우고
                     // 최종 텍스트로 debounce를 실행합니다.
-                    this.myCurrentUtterance = ''; 
-                    this.debounceMyCompletion(text); 
+                    this.myCurrentUtterance = '';
+                    this.debounceMyCompletion(text);
                 } else {
                     // 부분 결과(interim)인 경우, 화면에 실시간으로 업데이트합니다.
                     if (this.myCompletionTimer) clearTimeout(this.myCompletionTimer);
                     this.myCompletionTimer = null;
 
                     this.myCurrentUtterance = text;
-                    
+
                     const continuousText = (this.myCompletionBuffer + ' ' + this.myCurrentUtterance).trim();
 
                     this.sendToRenderer('stt-update', {
@@ -266,7 +266,7 @@ class SttService {
                         timestamp: Date.now(),
                     });
                 }
-                
+
             } else {
                 const type = message.type;
                 const text = message.transcript || message.delta || (message.alternatives && message.alternatives[0]?.transcript) || '';
@@ -306,12 +306,12 @@ class SttService {
                 console.log('[SttService] Ignoring message - session already closed');
                 return;
             }
-            
+
             if (this.modelInfo.provider === 'whisper') {
                 // Whisper STT emits 'transcription' events with different structure
                 if (message.text && message.text.trim()) {
                     const finalText = message.text.trim();
-                    
+
                     // Filter out Whisper noise transcriptions
                     const noisePatterns = [
                         '[BLANK_AUDIO]',
@@ -325,16 +325,16 @@ class SttService {
                         '(SOUND)',
                         '(NOISE)'
                     ];
-                    
-                    const isNoise = noisePatterns.some(pattern => 
+
+                    const isNoise = noisePatterns.some(pattern =>
                         finalText.includes(pattern) || finalText === pattern
                     );
-                    
-                    
+
+
                     // Only process if it's not noise, not a false positive, and has meaningful content
                     if (!isNoise && finalText.length > 2) {
                         this.debounceTheirCompletion(finalText);
-                        
+
                         this.sendToRenderer('stt-update', {
                             speaker: 'Them',
                             text: finalText,
@@ -359,7 +359,7 @@ class SttService {
                     }
                     return;
                 }
-            
+
                 const transcription = message.serverContent?.inputTranscription;
                 if (!transcription || !transcription.text) return;
 
@@ -369,7 +369,7 @@ class SttService {
                 }
 
                 this.debounceTheirCompletion(textChunk);
-                
+
                 this.sendToRenderer('stt-update', {
                     speaker: 'Them',
                     text: this.theirCompletionBuffer,
@@ -378,7 +378,7 @@ class SttService {
                     timestamp: Date.now(),
                 });
 
-            // Deepgram
+                // Deepgram
             } else if (this.modelInfo.provider === 'deepgram') {
                 const text = message.channel?.alternatives?.[0]?.transcript;
                 if (!text || text.trim().length === 0) return;
@@ -386,14 +386,14 @@ class SttService {
                 const isFinal = message.is_final;
 
                 if (isFinal) {
-                    this.theirCurrentUtterance = ''; 
-                    this.debounceTheirCompletion(text); 
+                    this.theirCurrentUtterance = '';
+                    this.debounceTheirCompletion(text);
                 } else {
                     if (this.theirCompletionTimer) clearTimeout(this.theirCompletionTimer);
                     this.theirCompletionTimer = null;
 
                     this.theirCurrentUtterance = text;
-                    
+
                     const continuousText = (this.theirCompletionBuffer + ' ' + this.theirCurrentUtterance).trim();
 
                     this.sendToRenderer('stt-update', {
@@ -430,7 +430,7 @@ class SttService {
                     }
                 }
             }
-            
+
             if (message.error) {
                 console.error('[Them] STT Session Error:', message.error);
             }
@@ -444,7 +444,7 @@ class SttService {
                 onclose: event => console.log('My STT session closed:', event.reason),
             },
         };
-        
+
         const theirSttConfig = {
             language: effectiveLanguage,
             callbacks: {
@@ -453,7 +453,7 @@ class SttService {
                 onclose: event => console.log('Their STT session closed:', event.reason),
             },
         };
-        
+
         const sttOptions = {
             apiKey: this.modelInfo.apiKey,
             language: effectiveLanguage,
@@ -546,7 +546,7 @@ class SttService {
     async sendMicAudioContent(data, mimeType) {
         // const provider = await this.getAiProvider();
         // const isGemini = provider === 'gemini';
-        
+
         if (!this.mySttSession) {
             throw new Error('User STT session not active');
         }
@@ -564,7 +564,7 @@ class SttService {
         if (modelInfo.provider === 'gemini') {
             payload = { audio: { data, mimeType: mimeType || 'audio/pcm;rate=24000' } };
         } else if (modelInfo.provider === 'deepgram') {
-            payload = Buffer.from(data, 'base64'); 
+            payload = Buffer.from(data, 'base64');
         } else {
             payload = data;
         }
@@ -627,7 +627,11 @@ class SttService {
     }
 
     async startMacOSAudioCapture() {
-        if (process.platform !== 'darwin' || !this.theirSttSession) return false;
+        if (process.platform !== 'darwin') {
+            console.warn('[SttService] System audio capture is only supported on macOS. Skipping.');
+            return false;
+        }
+        if (!this.theirSttSession) return false;
 
         await this.killExistingSystemAudioDump();
         console.log('Starting macOS audio capture for "Them"...');
@@ -784,7 +788,7 @@ class SttService {
         this.theirCurrentUtterance = '';
         this.myCompletionBuffer = '';
         this.theirCompletionBuffer = '';
-        this.modelInfo = null; 
+        this.modelInfo = null;
     }
 }
 
